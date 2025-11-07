@@ -1,0 +1,135 @@
+/*
+*  payment selection
+*/
+#input_container {
+    position:relative;
+    margin:0;
+
+}
+.insidebg {
+
+    background: #fbfbfb;
+    box-shadow: 0 0 0.8em #929292;
+    padding: 20px 20px 20px 90px;
+}
+
+#tpay-accept-regulations-checkbox {
+    margin-top: 15px;
+}
+
+.button_blik {
+    float: right;
+    border: none;
+    padding: 10px 20px;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 1px;
+    word-spacing: 4px;
+    color: #ffffff;
+    background: #5bc0de;
+    text-decoration: none;
+    display: block;
+    top: 0;
+    margin: 10px 0;
+}
+.button_blik:hover {
+    -moz-box-shadow: 0 0 10px #ccc;
+    -webkit-box-shadow: 0 0 10px #ccc;
+    box-shadow: 0 0 10px #ccc;
+    background: #4e7f9c;
+}
+#tpay-row {
+    position: relative;
+}
+
+#tpay-row a {
+    padding-left: 20px;
+    padding-bottom: 15px;
+    padding-top: 15px;
+}
+
+
+#tpay-row i,
+#tpay-nav i {
+    font-family: 'FontAwesome';
+}
+
+/*
+* order summary
+*/
+#tpay-order-summary {
+    width: 80%;
+    max-width: 900px;
+}
+
+#tpay-summary-content h4 {
+    border-bottom: 1px solid #ababab;
+    padding-bottom: 10px;
+}
+
+#tpay-summary-content ul {
+    list-style-type: disc;
+    padding-left: 25px;
+    margin: 10px 0;
+}
+
+#tpay-back {
+    text-transform: uppercase;
+    position: relative;
+    top: 10px;
+}
+
+#tpay-nav i {
+    position: absolute;
+    left: -14px;
+    top: -1px;
+}
+
+.tpay-form input[type=submit].left,
+button.tpay.left {
+    float: none;
+}
+
+.tpay-form input[type=submit]:hover,
+.tpay-form input[type=submit]:focus,
+#tpay-submit:hover,
+#tpay-submit:focus,
+button.tpay:hover,
+button.tpay:focus {
+    background: #4e7f9c;
+}
+
+/*#tpay-nav form,*/
+/*#tpay-form form {*/
+    /*display: none;*/
+/*}*/
+
+#tpay-success img {
+    margin: 10px 0;
+}
+
+#tpay-success h4 {
+    margin-left: 10px;
+}
+
+#tpay-success a {
+    color: #5bc0de;
+}
+
+#tpay-success a:hover,
+#tpay-success a:focus {
+    color: #F59D03;
+}
+
+#tpay-card-form {
+    max-width: 300px;
+}
+
+#tpay-card-form #continue_btn {
+    display: none;
+}
+
+#tpay-card-form #card_payment_form .amPmCheckbox input[type="checkbox"]+label {
+    width: 135px;
+    padding-top: 3px;
+}
