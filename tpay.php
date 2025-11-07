@@ -13,13 +13,15 @@
  * @license   LICENSE.txt
  */
 
+use PrestaShop\PrestaShop\Core\Payment\PaymentOption;
+
 if (!defined('_PS_VERSION_')) {
     exit;
 }
 
-require_once dirname(__FILE__) . '/tpayModel.php';
-require_once dirname(__FILE__) . '/helpers/TpayHelperClient.php';
-require_once dirname(__FILE__) . '/ConfigFieldsDef/ConfigFieldsNames.php';
+require_once __DIR__ . '/tpayModel.php';
+require_once __DIR__ . '/helpers/TpayHelperClient.php';
+require_once __DIR__ . '/ConfigFieldsDef/ConfigFieldsNames.php';
 
 define('TPAY_PAYMENT_BASIC', 'basic');
 define('TPAY_PAYMENT_CARDS', 'cards');
@@ -51,10 +53,10 @@ class Tpay extends PaymentModule
     {
         $this->name = 'tpay';
         $this->tab = 'payments_gateways';
-        $this->version = '1.7.4';
+        $this->version = '2.0.0';
         $this->author = 'Krajowy Integrator Płatności S.A.';
         $this->need_instance = 0;
-        $this->ps_versions_compliancy = array('min' => '1.6', 'max' => '1.7');
+        $this->ps_versions_compliancy = array('min' => '1.7.0.0', 'max' => _PS_VERSION_);
         $this->bootstrap = true;
         $this->currencies = true;
         $this->currencies_mode = 'checkbox';
@@ -80,13 +82,13 @@ class Tpay extends PaymentModule
             Shop::setContext(Shop::CONTEXT_ALL);
         }
 
-        if (version_compare(phpversion(), '5.6.0', '<')) {
+        if (version_compare(phpversion(), '8.1.0', '<')) {
             $this->_errors[] = $this->l(
                 sprintf(
                     'Your PHP version is too old, please upgrade to a newer version. Your version is %s,' .
                     ' library requires %s',
                     phpversion(),
-                    '5.6.0'
+                    '8.1.0'
                 )
             );
 
@@ -146,6 +148,7 @@ class Tpay extends PaymentModule
      */
     private function addOrderStates()
     {
+        $languages = Language::getLanguages(false);
         $newState = Configuration::get('TPAY_NEW');
         if (
             !$newState
@@ -158,7 +161,9 @@ class Tpay extends PaymentModule
         ) {
             $orderState = new OrderState();
 
-            $orderState->name = array_fill(0, 10, 'Waiting for payment (Tpay)');
+            foreach ($languages as $language) {
+                $orderState->name[$language['id_lang']] = $this->l('Waiting for payment (Tpay)');
+            }
             $orderState->send_email = 0;
             $orderState->invoice = 0;
             $orderState->color = '#5bc0de';
@@ -196,7 +201,9 @@ class Tpay extends PaymentModule
             !Validate::isLoadedObject(new OrderState($doneState))
         ) {
             $orderState = new OrderState();
-            $orderState->name = array_fill(0, 10, 'Payment received (Tpay)');
+            foreach ($languages as $language) {
+                $orderState->name[$language['id_lang']] = $this->l('Payment received (Tpay)');
+            }
             $orderState->send_email = true;
             $orderState->invoice = true;
             $orderState->color = '#00DE69';
@@ -234,7 +241,9 @@ class Tpay extends PaymentModule
             !Validate::isLoadedObject(new OrderState($errorState))
         ) {
             $orderState = new OrderState();
-            $orderState->name = array_fill(0, 10, 'Wrong payment (Tpay)');
+            foreach ($languages as $language) {
+                $orderState->name[$language['id_lang']] = $this->l('Wrong payment (Tpay)');
+            }
             $orderState->send_email = false;
             $orderState->invoice = false;
             $orderState->color = '#b52b27';
@@ -278,8 +287,17 @@ class Tpay extends PaymentModule
     public function uninstall()
     {
         $product = new Product(TpayHelperClient::getTpayFeeProductId());
-        $product->delete();
-        return !parent::uninstall() || !Configuration::deleteByName('tpay') ? false : true;
+        if (Validate::isLoadedObject($product)) {
+            $product->delete();
+        }
+
+        if (!parent::uninstall()) {
+            return false;
+        }
+
+        Configuration::deleteByName('tpay');
+
+        return true;
     }
 
     /**
@@ -476,11 +494,17 @@ class Tpay extends PaymentModule
      *
      * @return array
      */
-    public function hookPayment($returnPayments = false)
+    public function hookPayment($params)
     {
         $currency = $this->context->currency;
         if (!$this->active || TPAY_PS_17) {
             return false;
+        }
+        $returnPayments = false;
+        if (is_array($params) && array_key_exists('returnPayments', $params)) {
+            $returnPayments = (bool)$params['returnPayments'];
+        } elseif ($params === true) {
+            $returnPayments = true;
         }
         $feeProductId = TpayHelperClient::getTpayFeeProductId();
         $cart = $this->context->cart;
@@ -577,17 +601,23 @@ class Tpay extends PaymentModule
                 'payments' => $availablePayments[$key],
             ));
             $this->context->cookie->last_order = false;
-            $this->context->cookie->__unset('last_order');
+            unset($this->context->cookie->last_order);
             $cart = $this->context->cart;
             $orderTotal = $cart->getOrderTotal(true, Cart::BOTH);
             $surcharge = TpayHelperClient::getSurchargeValue($orderTotal);
             $surcharge > 0 ? $this->smarty->assign('surcharge',
                 number_format($surcharge, 2)) : $this->smarty->assign('surcharge', false);
-            $newOption = new PrestaShop\PrestaShop\Core\Payment\PaymentOption();
+            $newOption = new PaymentOption();
             $newOption->setModuleName($this->name)
                 ->setCallToActionText($this->l($availablePayments[$key]['title']))
-                ->setAction($this->context->link->getModuleLink($this->name,
-                    $paymentLinkAction . "?type=" . $availablePayments[$key]['type'], array(), true))
+                ->setAction(
+                    $this->context->link->getModuleLink(
+                        $this->name,
+                        $paymentLinkAction,
+                        ['type' => $availablePayments[$key]['type']],
+                        true
+                    )
+                )
                 ->setAdditionalInformation($this->fetch('module:tpay/views/templates/hook/tpay_intro.tpl'))
                 ->setLogo(_MODULE_DIR_ . 'tpay/views/img/logo.png');
             $options[] = $newOption;

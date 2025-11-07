@@ -92,7 +92,11 @@ class TpayRenewPaymentModuleFrontController extends ModuleFrontController
             'return_url' => $baseUrl.'index.php?controller=order-confirmation&id_cart='.
                 (int)$cart->id.'&id_module='.(int)$this->module->id.'&id_order='.$orderId.
                 '&key='.$customer->secure_key.'&status=success',
-            'return_error_url' => $this->context->link->getModuleLink('tpay', 'order-error').'?orderId='.$orderId,
+            'return_error_url' => $this->context->link->getModuleLink(
+                'tpay',
+                'ordererror',
+                ['orderId' => (int)$orderId]
+            ),
             'email' => $this->context->cookie->email,
             'name' => sprintf('%s %s', $billingAddress->firstname, $billingAddress->lastname),
             'phone' => $billingAddress->phone,
@@ -122,7 +126,9 @@ class TpayRenewPaymentModuleFrontController extends ModuleFrontController
         (new Util)->setLanguage($language);
         if (TPAY_PS_17) {
             $this->setTemplate(TPAY_17_PATH.'/redirect.tpl');
-            echo $tpayBasicClient->getTransactionForm($this->tpayClientConfig, true);
+            $this->context->smarty->assign(array(
+                'tpay_form' => $tpayBasicClient->getTransactionForm($this->tpayClientConfig, true),
+            ));
         } else {
             $this->setTemplate('tpayRedirect.tpl');
             $this->context->smarty->assign(array(

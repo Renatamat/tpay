@@ -37,7 +37,7 @@ class TpayValidationModuleFrontController extends ModuleFrontController
         parent::initContent();
 
         $this->displayPrecision = (int)Configuration::get('PS_PRICE_DISPLAY_PRECISION');
-        $this->context->controller->addCss(_MODULE_DIR_ . 'tpay/views/css/style.css');
+        $this->context->controller->addCSS(_MODULE_DIR_ . 'tpay/views/css/style.css');
         $cart = $this->context->cart;
         $customer = new Customer($cart->id_customer);
         $paymentType = Tools::getValue('type');
@@ -165,15 +165,19 @@ class TpayValidationModuleFrontController extends ModuleFrontController
         return $formProvider->getTransactionForm(
             [],
             false,
-            $this->context->link->getModuleLink('tpay', 'payment?type=' . $paymentType)
+            $this->context->link->getModuleLink('tpay', 'payment', ['type' => $paymentType])
         );
     }
 
     private function getBankForm($smallList = false, $regulations = true)
     {
         $formProvider = TpayHelperClient::getBasicClient();
-        return $formProvider->getBankSelectionForm([], $smallList, $regulations,
-            $this->context->link->getModuleLink('tpay', 'payment?type=' . TPAY_PAYMENT_BASIC));
+        return $formProvider->getBankSelectionForm(
+            [],
+            $smallList,
+            $regulations,
+            $this->context->link->getModuleLink('tpay', 'payment', ['type' => TPAY_PAYMENT_BASIC])
+        );
     }
 
     private function assignSmartyData($paymentForm, $nextTpl = null)
@@ -253,7 +257,7 @@ class TpayValidationModuleFrontController extends ModuleFrontController
         (new Util)->setLanguage($language)->setPath(__PS_BASE_URI__ . 'modules/tpay/tpayLibs/src/');
         $this->context->controller->addJS(_MODULE_DIR_ . 'tpay/tpayLibs/src/View/JS/jquery.payment.js');
         $form = $paymentCard->getOnSiteCardForm(
-            $this->context->link->getModuleLink('tpay', 'payment?type=' . TPAY_PAYMENT_CARDS),
+            $this->context->link->getModuleLink('tpay', 'payment', ['type' => TPAY_PAYMENT_CARDS]),
             false,
             false
         );
@@ -272,7 +276,7 @@ class TpayValidationModuleFrontController extends ModuleFrontController
     {
         $formProvider = TpayHelperClient::getBasicClient();
         return $formProvider->getBlikSelectionForm(
-            $this->context->link->getModuleLink('tpay', 'payment?type=' . TPAY_PAYMENT_BLIK)
+            $this->context->link->getModuleLink('tpay', 'payment', ['type' => TPAY_PAYMENT_BLIK])
         );
     }
 

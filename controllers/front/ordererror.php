@@ -21,14 +21,14 @@ class TpayOrderErrorModuleFrontController extends ModuleFrontController
     public function initContent()
     {
         $this->emptyCart();
-        $this->context->cookie->__unset('last_order');
+        unset($this->context->cookie->last_order);
         $this->context->cookie->last_order = false;
         $this->cartId = 0;
-        $this->context->controller->addCss(_MODULE_DIR_.'tpay/views/css/style.css');
+        $this->context->controller->addCSS(_MODULE_DIR_.'tpay/views/css/style.css');
         $this->display_column_left = false;
         parent::initContent();
 
-        $orderId = Tools::getValue('orderId');
+        $orderId = (int)Tools::getValue('orderId');
         $order = new Order($orderId);
         $payments = $order->getOrderPayments();
         $currency = new Currency($order->id_currency);
@@ -37,11 +37,14 @@ class TpayOrderErrorModuleFrontController extends ModuleFrontController
         } else {
             $this->context->smarty->assign(array(
                     'tpayUrl' => $this->context->link->getModuleLink(
-                        'tpay', 'renewPayment', array('orderId' => $orderId)),
+                        'tpay',
+                        'renewPayment',
+                        array('orderId' => $orderId)
+                    ),
                 )
             );
             TPAY_PS_17 ? $this->setTemplate(TPAY_17_PATH.'/orderErrorWithRenew17.tpl') :
-                $this->setTemplate('../hook/renew.tpl');
+                $this->setTemplate('module:tpay/views/templates/hook/renew.tpl');
         }
     }
 
