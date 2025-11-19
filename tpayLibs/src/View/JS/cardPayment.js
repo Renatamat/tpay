@@ -65,10 +65,16 @@ function CardPayment(url, pubkey) {
             maxPayloadLength,
             payload,
             originBudget;
+        console.debug('[CardPayment] Submitting payment.');
         toggleProcessingState(true);
         encrypt.setPublicKey(decoded);
-        key = encrypt.getKey();
+        key = encrypt && encrypt.pubkey;
+        if (!key) {
+            console.warn('[CardPayment] RSA key is not available after setPublicKey.');
+        }
         maxPayloadLength = getMaxPayloadLengthFromKey(key);
+        console.debug('[CardPayment] Base payload length:', basePayload.length);
+        console.debug('[CardPayment] RSA payload limit:', maxPayloadLength);
         if (isFinite(maxPayloadLength) && basePayload.length > maxPayloadLength) {
             console.error('RSA key is too small for the payment payload.');
             showEncryptionError('Nie można zaszyfrować danych karty. Klucz publiczny jest nieprawidłowy lub zbyt krótki.');
@@ -79,6 +85,7 @@ function CardPayment(url, pubkey) {
             ? Math.max(0, maxPayloadLength - basePayload.length - 1)
             : undefined;
         payload = basePayload + '|' + getShortOrigin(originBudget);
+        console.debug('[CardPayment] Origin budget:', originBudget);
         try {
             encrypted = encrypt.encrypt(payload);
         } catch (error) {
@@ -93,6 +100,7 @@ function CardPayment(url, pubkey) {
 
             return;
         }
+        console.debug('[CardPayment] Encryption successful, submitting form.');
         $("#carddata").val(encrypted);
         $("#card_vendor").val($.payment.cardType(cardNumber));
         numberInput.val('');
