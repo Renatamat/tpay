@@ -10,9 +10,20 @@ function CardPayment(url, pubkey) {
         termsOfServiceInput = $('#tpay-cards-accept-regulations-checkbox');
     const TRIGGER_EVENTS = 'input change blur';
 
+    function getShortOrigin() {
+        var fallbackOrigin = document.location.protocol + '//' + document.location.host,
+            origin = document.location.origin || fallbackOrigin,
+            MAX_ORIGIN_LENGTH = 60;
+
+        // RSA payload has a strict size limit (key size - 11 bytes). Truncate
+        // the origin to make sure encrypting the concatenated card payload does
+        // not exceed the limit on stores with very long host names.
+        return origin.substring(0, MAX_ORIGIN_LENGTH);
+    }
+
     function SubmitPayment() {
         var cardNumber = numberInput.val().replace(/\s/g, ''),
-            cd = cardNumber + '|' + expiryInput.val().replace(/\s/g, '') + '|' + cvcInput.val().replace(/\s/g, '') + '|' + document.location.origin,
+            cd = cardNumber + '|' + expiryInput.val().replace(/\s/g, '') + '|' + cvcInput.val().replace(/\s/g, '') + '|' + getShortOrigin(),
             encrypt = new JSEncrypt(),
             decoded = Base64.decode(pubkey),
             encrypted;
