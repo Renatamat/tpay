@@ -78,6 +78,7 @@ class PaymentCardForms extends PaymentCard
     ) {
         $data = [
             'rsa_key' => $this->cardKeyRSA,
+            'rsa_hash_alg' => $this->cardHashAlg,
             'payment_redirect_path' => $paymentRedirectPath,
             'card_save_allowed' => $cardSaveAllowed,
             'showPayerFields' => $payerFields,
