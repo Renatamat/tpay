@@ -1,4 +1,4 @@
-function CardPayment(url, pubkey) {
+function CardPayment(url, pubkey, hashAlg) {
     this.url = url;
     this.pubkey = pubkey;
     $("#card_payment_form").attr("action", url);
@@ -9,6 +9,47 @@ function CardPayment(url, pubkey) {
         emailInput = $('#c_email'),
         termsOfServiceInput = $('#tpay-cards-accept-regulations-checkbox');
     const TRIGGER_EVENTS = 'input change blur';
+
+    function describeKeyEncoding(rawKey) {
+        if (!rawKey) {
+            return '';
+        }
+
+        var trimmed = rawKey.replace(/\s+/g, ''),
+            base64Pattern = /^[A-Za-z0-9+/=]+$/,
+            looksLikePem = /-----BEGIN (RSA )?PUBLIC KEY-----/i.test(rawKey);
+
+        if (looksLikePem) {
+            return 'Klucz publiczny RSA jest przekazywany w formacie PEM.';
+        }
+        if (trimmed.length % 4 === 0 && base64Pattern.test(trimmed)) {
+            return 'Klucz publiczny RSA jest przekazywany w formacie Base64.';
+        }
+
+        return 'Format klucza publicznego RSA nie został rozpoznany.';
+    }
+
+    function buildKeyDebugInfo(decodedKey) {
+        var info = [],
+            encodingInfo = describeKeyEncoding(pubkey);
+
+        if (hashAlg) {
+            info.push('Algorytm skrótu ustawiony w module: ' + hashAlg + '.');
+        }
+        if (encodingInfo) {
+            info.push(encodingInfo);
+        }
+
+        if (decodedKey) {
+            info.push('Przekazany klucz publiczny RSA: ' + decodedKey);
+        } else if (!pubkey) {
+            info.push('Brak przekazanego klucza publicznego RSA.');
+        } else {
+            info.push('Nie udało się zdekodować klucza RSA, wartość źródłowa: ' + pubkey);
+        }
+
+        return info.length ? ' ' + info.join(' ') : '';
+    }
 
     function getShortOrigin(maxLength) {
         var fallbackOrigin = document.location.protocol + '//' + document.location.host,
@@ -60,12 +101,15 @@ function CardPayment(url, pubkey) {
             basePayload = cardNumber + '|' + expiry + '|' + cvc,
             encrypt = new JSEncrypt(),
             decoded = Base64.decode(pubkey),
+            keyDebugInfo = buildKeyDebugInfo(decoded),
             encrypted,
             key,
             maxPayloadLength,
             payload,
             originBudget;
         console.debug('[CardPayment] Submitting payment.');
+        console.debug('[CardPayment] Hash algorithm configured:', hashAlg || '(nie przekazano)');
+        console.debug('[CardPayment] RSA key encoding info:', describeKeyEncoding(pubkey) || '(brak danych)');
         toggleProcessingState(true);
         encrypt.setPublicKey(decoded);
         key = encrypt && encrypt.pubkey;
@@ -77,7 +121,7 @@ function CardPayment(url, pubkey) {
         console.debug('[CardPayment] RSA payload limit:', maxPayloadLength);
         if (isFinite(maxPayloadLength) && basePayload.length > maxPayloadLength) {
             console.error('RSA key is too small for the payment payload.');
-            showEncryptionError('Nie można zaszyfrować danych karty. Klucz publiczny jest nieprawidłowy lub zbyt krótki.');
+            showEncryptionError('Nie można zaszyfrować danych karty. Klucz publiczny jest nieprawidłowy lub zbyt krótki.' + keyDebugInfo);
 
             return;
         }
@@ -90,13 +134,13 @@ function CardPayment(url, pubkey) {
             encrypted = encrypt.encrypt(payload);
         } catch (error) {
             console.error('Encrypting card data failed.', error);
-            showEncryptionError();
+            showEncryptionError('Nie można zaszyfrować danych karty. Skontaktuj się z obsługą sklepu.' + keyDebugInfo);
 
             return;
         }
         if (!encrypted) {
             console.error('Encrypting card data returned an empty result.');
-            showEncryptionError();
+            showEncryptionError('Nie można zaszyfrować danych karty. Skontaktuj się z obsługą sklepu.' + keyDebugInfo);
 
             return;
         }

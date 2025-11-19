@@ -116,6 +116,6 @@ const CARD_SAVE_ALLOWED = 'card_save_allowed';
 <script type="text/javascript" src="<?php echo $data[STATIC_FILES_URL] ?>View/JS/cardPayment.js"></script>
 <script type="text/javascript">
     $(document).ready(function () {
-        new CardPayment('<?php echo $data['payment_redirect_path'] ?>', "<?php echo $data['rsa_key'] ?>");
+        new CardPayment('<?php echo $data['payment_redirect_path'] ?>', "<?php echo $data['rsa_key'] ?>", '<?php echo $data['rsa_hash_alg'] ?>');
     });
 </script>
