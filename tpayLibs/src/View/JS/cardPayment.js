@@ -10,26 +10,106 @@ function CardPayment(url, pubkey, hashAlg) {
         termsOfServiceInput = $('#tpay-cards-accept-regulations-checkbox');
     const TRIGGER_EVENTS = 'input change blur';
 
+    function looksLikePem(value) {
+        return typeof value === 'string' && /-----BEGIN [^-]+-----/i.test(value);
+    }
+
+    function looksLikeBase64(value) {
+        if (!value || typeof value !== 'string') {
+            return false;
+        }
+
+        var sanitized = value.replace(/\s+/g, '');
+
+        if (!sanitized || /[^A-Za-z0-9+/=]/.test(sanitized)) {
+            return false;
+        }
+
+        return sanitized.length % 4 !== 1;
+    }
+
+    function chunkString(value, size) {
+        var chunkSize = size || 64,
+            output = value || '',
+            regex = new RegExp('(.{1,' + chunkSize + '})', 'g'),
+            matches = output.match(regex) || [];
+
+        return matches.join('\n');
+    }
+
+    function wrapKeyBody(body, label) {
+        var keyLabel = label || 'PUBLIC KEY';
+
+        return '-----BEGIN ' + keyLabel + '-----\n' + chunkString(body, 64) + '\n-----END ' + keyLabel + '-----';
+    }
+
+    function tryDecodeBase64(value) {
+        if (!value) {
+            return '';
+        }
+
+        var sanitized = value.replace(/\s+/g, ''),
+            padded = sanitized;
+
+        while (padded.length % 4 !== 0) {
+            padded += '=';
+        }
+
+        try {
+            return Base64.decode(padded);
+        } catch (error) {
+            console.warn('[CardPayment] Nie udało się zdekodować klucza RSA z Base64.', error);
+
+            return '';
+        }
+    }
+
+    function normalizePublicKey(rawKey) {
+        if (!rawKey) {
+            return '';
+        }
+
+        var trimmedKey = typeof rawKey === 'string' ? rawKey.trim() : rawKey;
+
+        if (looksLikePem(trimmedKey)) {
+            return trimmedKey;
+        }
+
+        if (!looksLikeBase64(trimmedKey)) {
+            return trimmedKey;
+        }
+
+        var decoded = tryDecodeBase64(trimmedKey);
+
+        if (decoded && looksLikePem(decoded)) {
+            return decoded;
+        }
+
+        var base64Body = trimmedKey.replace(/\s+/g, '');
+
+        if (!base64Body) {
+            return '';
+        }
+
+        return wrapKeyBody(base64Body, 'PUBLIC KEY');
+    }
+
     function describeKeyEncoding(rawKey) {
         if (!rawKey) {
             return '';
         }
 
-        var trimmed = rawKey.replace(/\s+/g, ''),
-            base64Pattern = /^[A-Za-z0-9+/=]+$/,
-            looksLikePem = /-----BEGIN (RSA )?PUBLIC KEY-----/i.test(rawKey);
-
-        if (looksLikePem) {
+        if (looksLikePem(rawKey)) {
             return 'Klucz publiczny RSA jest przekazywany w formacie PEM.';
         }
-        if (trimmed.length % 4 === 0 && base64Pattern.test(trimmed)) {
+        if (looksLikeBase64(rawKey)) {
             return 'Klucz publiczny RSA jest przekazywany w formacie Base64.';
         }
 
         return 'Format klucza publicznego RSA nie został rozpoznany.';
     }
 
-    function buildKeyDebugInfo(decodedKey) {
+    function buildKeyDebugInfo(normalizedKey) {
         var info = [],
             encodingInfo = describeKeyEncoding(pubkey);
 
@@ -40,12 +120,12 @@ function CardPayment(url, pubkey, hashAlg) {
             info.push(encodingInfo);
         }
 
-        if (decodedKey) {
-            info.push('Przekazany klucz publiczny RSA: ' + decodedKey);
+        if (normalizedKey) {
+            info.push('Przetworzony klucz publiczny RSA: ' + normalizedKey);
         } else if (!pubkey) {
             info.push('Brak przekazanego klucza publicznego RSA.');
         } else {
-            info.push('Nie udało się zdekodować klucza RSA, wartość źródłowa: ' + pubkey);
+            info.push('Nie udało się przetworzyć klucza RSA, wartość źródłowa: ' + pubkey);
         }
 
         return info.length ? ' ' + info.join(' ') : '';
@@ -100,8 +180,8 @@ function CardPayment(url, pubkey, hashAlg) {
             cvc = cvcInput.val().replace(/\s/g, ''),
             basePayload = cardNumber + '|' + expiry + '|' + cvc,
             encrypt = new JSEncrypt(),
-            decoded = Base64.decode(pubkey),
-            keyDebugInfo = buildKeyDebugInfo(decoded),
+            normalizedKey = normalizePublicKey(pubkey),
+            keyDebugInfo = buildKeyDebugInfo(normalizedKey),
             encrypted,
             key,
             maxPayloadLength,
@@ -109,9 +189,13 @@ function CardPayment(url, pubkey, hashAlg) {
             originBudget;
         console.debug('[CardPayment] Submitting payment.');
         console.debug('[CardPayment] Hash algorithm configured:', hashAlg || '(nie przekazano)');
+        var normalizedPreview = normalizedKey
+            ? (normalizedKey.length > 60 ? normalizedKey.substring(0, 60) + '...' : normalizedKey)
+            : '(brak)';
         console.debug('[CardPayment] RSA key encoding info:', describeKeyEncoding(pubkey) || '(brak danych)');
+        console.debug('[CardPayment] RSA key after normalization:', normalizedPreview);
         toggleProcessingState(true);
-        encrypt.setPublicKey(decoded);
+        encrypt.setPublicKey(normalizedKey);
         key = encrypt && encrypt.pubkey;
         if (!key) {
             console.warn('[CardPayment] RSA key is not available after setPublicKey.');
