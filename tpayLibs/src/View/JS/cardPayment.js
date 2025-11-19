@@ -10,27 +10,89 @@ function CardPayment(url, pubkey) {
         termsOfServiceInput = $('#tpay-cards-accept-regulations-checkbox');
     const TRIGGER_EVENTS = 'input change blur';
 
-    function getShortOrigin() {
+    function getShortOrigin(maxLength) {
         var fallbackOrigin = document.location.protocol + '//' + document.location.host,
             origin = document.location.origin || fallbackOrigin,
-            MAX_ORIGIN_LENGTH = 60;
+            MAX_ORIGIN_LENGTH = 60,
+            hasCustomLimit = typeof maxLength === 'number' && isFinite(maxLength),
+            limit = hasCustomLimit ? maxLength : MAX_ORIGIN_LENGTH;
+
+        if (limit < 0) {
+            limit = 0;
+        }
 
         // RSA payload has a strict size limit (key size - 11 bytes). Truncate
         // the origin to make sure encrypting the concatenated card payload does
         // not exceed the limit on stores with very long host names.
-        return origin.substring(0, MAX_ORIGIN_LENGTH);
+        return origin.substring(0, limit);
+    }
+
+    function getMaxPayloadLengthFromKey(key) {
+        if (!key || !key.n || typeof key.n.bitLength !== 'function') {
+            return Infinity;
+        }
+
+        var bitLength = key.n.bitLength(),
+            byteLength = Math.ceil(bitLength / 8);
+
+        return Math.max(0, byteLength - 11);
+    }
+
+    function toggleProcessingState(isProcessing) {
+        if (isProcessing) {
+            $("#card_continue_btn").fadeOut();
+            $("#loading_scr").fadeIn();
+        } else {
+            $("#loading_scr").fadeOut();
+            $("#card_continue_btn").fadeIn();
+        }
+    }
+
+    function showEncryptionError(message) {
+        toggleProcessingState(false);
+        alert(message || 'Nie można zaszyfrować danych karty. Skontaktuj się z obsługą sklepu.');
     }
 
     function SubmitPayment() {
         var cardNumber = numberInput.val().replace(/\s/g, ''),
-            cd = cardNumber + '|' + expiryInput.val().replace(/\s/g, '') + '|' + cvcInput.val().replace(/\s/g, '') + '|' + getShortOrigin(),
+            expiry = expiryInput.val().replace(/\s/g, ''),
+            cvc = cvcInput.val().replace(/\s/g, ''),
+            basePayload = cardNumber + '|' + expiry + '|' + cvc,
             encrypt = new JSEncrypt(),
             decoded = Base64.decode(pubkey),
-            encrypted;
-        $("#card_continue_btn").fadeOut();
-        $("#loading_scr").fadeIn();
+            encrypted,
+            key,
+            maxPayloadLength,
+            payload,
+            originBudget;
+        toggleProcessingState(true);
         encrypt.setPublicKey(decoded);
-        encrypted = encrypt.encrypt(cd);
+        key = encrypt.getKey();
+        maxPayloadLength = getMaxPayloadLengthFromKey(key);
+        if (isFinite(maxPayloadLength) && basePayload.length > maxPayloadLength) {
+            console.error('RSA key is too small for the payment payload.');
+            showEncryptionError('Nie można zaszyfrować danych karty. Klucz publiczny jest nieprawidłowy lub zbyt krótki.');
+
+            return;
+        }
+        originBudget = isFinite(maxPayloadLength)
+            ? Math.max(0, maxPayloadLength - basePayload.length - 1)
+            : undefined;
+        payload = basePayload + '|' + getShortOrigin(originBudget);
+        try {
+            encrypted = encrypt.encrypt(payload);
+        } catch (error) {
+            console.error('Encrypting card data failed.', error);
+            showEncryptionError();
+
+            return;
+        }
+        if (!encrypted) {
+            console.error('Encrypting card data returned an empty result.');
+            showEncryptionError();
+
+            return;
+        }
         $("#carddata").val(encrypted);
         $("#card_vendor").val($.payment.cardType(cardNumber));
         numberInput.val('');
