@@ -117,6 +117,15 @@ class TpayValidationModuleFrontController extends ModuleFrontController
         if (($paymentType === TPAY_PAYMENT_INSTALLMENTS) && (int)Configuration::get('TPAY_INSTALLMENTS_ACTIVE') !== 1) {
             Tools::redirect($errorRedirectLink);
         }
+        if (
+            !$this->module->isPolishDeliveryAddress()
+            && in_array(
+                $paymentType,
+                array(TPAY_PAYMENT_BASIC, TPAY_PAYMENT_BLIK, TPAY_PAYMENT_INSTALLMENTS)
+            )
+        ) {
+            Tools::redirect($errorRedirectLink);
+        }
     }
 
     /**
