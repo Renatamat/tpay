@@ -45,6 +45,7 @@ class Tpay extends PaymentModule
     const LOGO_PATH = 'tpay/views/img/tpay_logo_230.png';
     const BANK_ON_SHOP = 'TPAY_BANK_ON_SHOP';
     const CHECK_PROXY = 'TPAY_CHECK_PROXY';
+    const POLAND_COUNTRY_ID = 14;
 
     /**
      * Basic module info.
@@ -517,7 +518,8 @@ class Tpay extends PaymentModule
         $blikActive = (int)Configuration::get('TPAY_BLIK_ACTIVE');
         $cardActive = (int)Configuration::get('TPAY_CARD_ACTIVE');
         $installmentsActive = (int)Configuration::get('TPAY_INSTALLMENTS_ACTIVE');
-        if ($basicActive === 1 && $currency->iso_code === 'PLN') {
+        $isPolishDelivery = $this->isPolishDeliveryAddress();
+        if ($basicActive === 1 && $currency->iso_code === 'PLN' && $isPolishDelivery) {
             $availablePayments[] = $this->getPaymentOption(TPAY_PAYMENT_BASIC,
                 $this->l('Pay by online transfer with Tpay'));
             if ($installmentsActive === 1 && $orderTotal >= 300 && $orderTotal <= 9259) {
@@ -525,7 +527,7 @@ class Tpay extends PaymentModule
                     $this->l('Pay by installments with tpay'));
             }
         }
-        if ($blikActive === 1 && $currency->iso_code === 'PLN') {
+        if ($blikActive === 1 && $currency->iso_code === 'PLN' && $isPolishDelivery) {
             $availablePayments[] = $this->getPaymentOption(TPAY_PAYMENT_BLIK, $this->l('Pay by BLIK code with Tpay'));
         }
         if ($cardActive === 1 && TpayHelperClient::getCardMidNumber($currency->iso_code,
@@ -637,8 +639,9 @@ class Tpay extends PaymentModule
         $cart = $this->context->cart;
         $orderTotal = $cart->getOrderTotal(true, Cart::BOTH);
         $availablePayments = array();
+        $isPolishDelivery = $this->isPolishDeliveryAddress();
 
-        if ($basicActive && $currency->iso_code === 'PLN') {
+        if ($basicActive && $currency->iso_code === 'PLN' && $isPolishDelivery) {
             $paymentTitle = $this->l('Pay by online transfer with Tpay');
             $availablePayments[] = $this->getPaymentData(TPAY_PAYMENT_BASIC, $paymentTitle, $paymentLinkAction);
 
@@ -648,7 +651,7 @@ class Tpay extends PaymentModule
                     $paymentLinkAction);
             }
         }
-        if ($blikActive && $currency->iso_code === 'PLN') {
+        if ($blikActive && $currency->iso_code === 'PLN' && $isPolishDelivery) {
             $paymentTitle = $this->l('Pay by blik code with Tpay');
             $availablePayments[] = $this->getPaymentData(TPAY_PAYMENT_BLIK, $paymentTitle, $paymentLinkAction);
         }
@@ -673,6 +676,20 @@ class Tpay extends PaymentModule
             'action' => $this->context->link->getModuleLink($this->name, 'validation', array('type' => $type),
                 true),
         ];
+    }
+
+    public function isPolishDeliveryAddress()
+    {
+        $cart = $this->context->cart;
+        if (!$cart || !(int)$cart->id_address_delivery) {
+            return true;
+        }
+        $deliveryAddress = new Address((int)$cart->id_address_delivery);
+        if (!Validate::isLoadedObject($deliveryAddress)) {
+            return true;
+        }
+
+        return (int)$deliveryAddress->id_country === static::POLAND_COUNTRY_ID;
     }
 
     /**
